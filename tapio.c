@@ -1,4 +1,4 @@
-// tapio: tap to stdin/stdout (c) 2018 magicnat
+// tapio: tun/tap to stdio (c) 2018 magicnat
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,24 +15,30 @@
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    fprintf(stderr, "usage: %s IFNAME [mtu MTU] [frag STDOUT_BUF] [noheader]\n", argv[0]);
-    fprintf(stderr, "  stdout buffer size = MTU + 14 (w/o tapio header)\n");
-    fprintf(stderr, "                  or = MTU + 18 (w/ tapio header)\n");
+    fprintf(stderr, "usage: %s IFNAME [ mtu MTU ] [ mode { tun | tap } ] [ noheader ]\n", argv[0]);
+    fprintf(stderr, "  stdout buffer size = MTU + 14 (w/o tapio header, tap)\n");
+    fprintf(stderr, "                  or = MTU + 18 (w/ tapio header, tap)\n");
+    fprintf(stderr, "                  or = MTU + 4 (w/ tapio header, tap)\n");
+    fprintf(stderr, "                  or = MTU (w/o tapio header, tap)\n");
     exit(1);
   }
 
-  int TBufLen = 1500, Tfd, RBufLen = 0, WBufLen = 0, PLen, noheader = 0;
-
-  for(int i = 2; i < argc; i++) {
-    if(strcmp(argv[i], "mtu") == 0) TBufLen = atoi(argv[++i]);
-    if(strcmp(argv[i], "noheader") == 0) noheader = 1;
-  }
+  int TBufLen = 1500, Tfd, RBufLen = 0, WBufLen = 0, PLen, noheader = 0, tun = 0;
 
   struct ifreq ifr;
   memset(&ifr, 0, sizeof(ifr));
 
   strncpy(ifr.ifr_name, argv[1], IFNAMSIZ);
   ifr.ifr_flags = IFF_TAP;
+
+  for(int i = 2; i < argc; i++) {
+    if(strcmp(argv[i], "mtu") == 0) TBufLen = atoi(argv[++i]);
+    if(strcmp(argv[i], "mode") == 0 && strcmp(argv[++i], "tun") == 0) {
+      tun = 1;
+      ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
+    }
+    if(strcmp(argv[i], "noheader") == 0) noheader = 1;
+  }
 
   Tfd = open("/dev/net/tun", O_RDWR);
   if (ioctl(Tfd, TUNSETIFF, (void *)&ifr) < 0) {
@@ -41,7 +47,7 @@ int main(int argc, char** argv) {
   }
 
   ifr.ifr_mtu = TBufLen;
-  TBufLen += (noheader ? 14 : 18);
+  TBufLen += (noheader ? 14 : 18) + (tun ? -14 : 0);
 
   if (ioctl(socket(AF_INET, SOCK_STREAM, IPPROTO_IP), SIOCSIFMTU, (void *)&ifr) < 0)
     fprintf(stderr, "[WARN] SIOCSIFMTU failed, please set MTU of %s to %d manually.\n", ifr.ifr_name, ifr.ifr_mtu);
@@ -49,7 +55,7 @@ int main(int argc, char** argv) {
   fd_set RFdSet, WFdSet;
   unsigned char RBuf[TBufLen], WBuf[TBufLen];
 
-  fprintf(stderr, "[INFO] Attached to %s, Frame length %d.\n", argv[1], TBufLen);
+  fprintf(stderr, "[INFO] Attached to %s, Frame length %d, mode %s.\n", argv[1], TBufLen, tun ? "tun" : "tap");
   if (noheader)
     fprintf(stderr, "[INFO] noheader was set, tapio header will be omit.\n");
 
