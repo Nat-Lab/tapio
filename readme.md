@@ -1,6 +1,6 @@
-tapio: A simple TAP to stdin/stdout proxy.
+tapio: A simple TUN/TAP to stdio proxy.
 ---
-`tapio` is a simple TAP to stdin/stdout proxy.
+`tapio` is a simple TUN/TAP to stdio proxy.
 
 ### Usage
 

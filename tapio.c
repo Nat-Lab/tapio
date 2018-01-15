@@ -18,8 +18,8 @@ int main(int argc, char** argv) {
     fprintf(stderr, "usage: %s IFNAME [ mtu MTU ] [ mode { tun | tap } ] [ noheader ]\n", argv[0]);
     fprintf(stderr, "  stdout buffer size = MTU + 14 (w/o tapio header, tap)\n");
     fprintf(stderr, "                  or = MTU + 18 (w/ tapio header, tap)\n");
-    fprintf(stderr, "                  or = MTU + 4 (w/ tapio header, tap)\n");
-    fprintf(stderr, "                  or = MTU (w/o tapio header, tap)\n");
+    fprintf(stderr, "                  or = MTU + 4 (w/ tapio header, tun)\n");
+    fprintf(stderr, "                  or = MTU (w/o tapio header, tun)\n");
     exit(1);
   }
 
@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
   }
 
   ifr.ifr_mtu = TBufLen;
-  TBufLen += (noheader ? 14 : 18) + (tun ? -14 : 0);
+  TBufLen += (tun ? 0 : 14);
 
   if (ioctl(socket(AF_INET, SOCK_STREAM, IPPROTO_IP), SIOCSIFMTU, (void *)&ifr) < 0)
     fprintf(stderr, "[WARN] SIOCSIFMTU failed, please set MTU of %s to %d manually.\n", ifr.ifr_name, ifr.ifr_mtu);
@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
   fd_set RFdSet, WFdSet;
   unsigned char RBuf[TBufLen], WBuf[TBufLen];
 
-  fprintf(stderr, "[INFO] Attached to %s, Frame length %d, mode %s.\n", argv[1], TBufLen, tun ? "tun" : "tap");
+  fprintf(stderr, "[INFO] Attached to %s, stdout buffer %d, mode %s.\n", argv[1], TBufLen, tun ? "tun" : "tap");
   if (noheader)
     fprintf(stderr, "[INFO] noheader was set, tapio header will be omit.\n");
 
@@ -82,9 +82,7 @@ int main(int argc, char** argv) {
       WBufLen = 0;
       if(!noheader) {
         read(0, &PLen, 4);
-        while(WBufLen < PLen) {
-          WBufLen += read(0, WBuf, PLen - WBufLen);
-        }
+        while(WBufLen < PLen) WBufLen += read(0, WBuf, PLen - WBufLen);
       } else WBufLen = read(0, WBuf, TBufLen);
     }
 
