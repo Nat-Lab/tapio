@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
   memset(&ifr, 0, sizeof(ifr));
 
   strncpy(ifr.ifr_name, argv[1], IFNAMSIZ);
-  ifr.ifr_flags = IFF_TAP;
+  ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
 
   for(int i = 2; i < argc; i++) {
     if(strcmp(argv[i], "mtu") == 0) TBufLen = atoi(argv[++i]);
