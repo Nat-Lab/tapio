@@ -6,7 +6,6 @@
 #include <string.h>
 #include <fcntl.h>
 
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <linux/if.h>
@@ -53,14 +52,12 @@ int main(int argc, char** argv) {
   if (ioctl(socket(AF_INET, SOCK_STREAM, IPPROTO_IP), SIOCSIFMTU, (void *)&ifr) < 0)
     fprintf(stderr, "[WARN] SIOCSIFMTU failed, please set MTU of %s to %d manually.\n", ifr.ifr_name, ifr.ifr_mtu);
 
-  unsigned char buffer[65536];
+  fd_set RFdSet, WFdSet;
+  unsigned char RBuf[TBufLen], WBuf[TBufLen];
 
   fprintf(stderr, "[INFO] Attached to %s, stdout buffer %d, mode %s.\n", argv[1], TBufLen, tun ? "tun" : "tap");
   if (noheader)
     fprintf(stderr, "[INFO] noheader was set, tapio header will be omit.\n");
-
-  int pid = fork();
-
 
   do {
     FD_ZERO(&RFdSet);
@@ -74,10 +71,10 @@ int main(int argc, char** argv) {
     if(select(Tfd + 1, &RFdSet, &WFdSet, NULL, NULL) < 0) continue;
 
     if (FD_ISSET(Tfd, &RFdSet) && RBufLen == 0)
-      RBufLen = read(Tfd, RBuf, sizeof(RBuf));
+      RBufLen = read(Tfd, RBuf, TBufLen);
 
     if (FD_ISSET(Tfd, &WFdSet) && WBufLen > 0) {
-      write(Tfd, WBuf, sizeof(WBuf));
+      write(Tfd, WBuf, WBufLen);
       WBufLen = 0;
     }
 
@@ -86,7 +83,7 @@ int main(int argc, char** argv) {
       if(!noheader) {
         read(0, &PLen, 4);
         while(WBufLen < PLen) WBufLen += read(0, WBuf, PLen - WBufLen);
-      } else WBufLen = read(0, WBuf, sizeof(WBuf));
+      } else WBufLen = read(0, WBuf, TBufLen);
     }
 
     if (FD_ISSET(1, &WFdSet) && RBufLen > 0) {
